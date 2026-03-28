@@ -1,0 +1,23 @@
+{
+  "name": "vite-mvvm",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/model",
+    "packages/services",
+    "packages/ui"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w packages/ui",
+    "build": "tsc --build && npm run vite:build -w packages/ui",
+    "test": "npm test --workspaces --if-present",
+    "test:shared": "npm test -w packages/shared",
+    "test:model": "npm test -w packages/model",
+    "test:services": "npm test -w packages/services",
+    "test:ui": "npm test -w packages/ui",
+    "deps": "npm ls --depth=0",
+    "postinstall": "npm run deps && npm test"
+  }
+}

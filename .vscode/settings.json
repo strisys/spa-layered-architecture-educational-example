@@ -1,0 +1,10 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "bash.exe.stackdump": true,
+    ".claude": true,
+    "**/*.tsbuildinfo": true,
+    "**/dist": true,
+    ".gitignore": true
+  }
+}
