@@ -17,7 +17,6 @@ export const useTodoViewModel: UseBoundStore<StoreApi<ITodoViewModelStore>> = cr
   };
 
   const vm = new TodoViewModel(notify);
-  queueMicrotask(() => vm.init());
 
   return { vm, version: 0 };
 });

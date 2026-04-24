@@ -20,47 +20,44 @@ beforeEach(async () => {
   useTodoViewModel = mod.useTodoViewModel;
 });
 
-describe("useTodoViewModel", () => {
-  it("should initialise with a ViewModel instance and begin loading", () => {
-    const { result } = renderHook(() => useTodoViewModel());
+async function renderAndInit(): Promise<ReturnType<typeof renderHook<ITodoViewModelStore, unknown>>> {
+  const hook = renderHook(() => useTodoViewModel());
 
-    // version may already be ≥1 because queueMicrotask fires vm.init() synchronously
-    // within the microtask queue before renderHook returns
-    expect(result.current.version).toBeGreaterThanOrEqual(0);
-    expect(result.current.vm).toBeDefined();
-    expect(typeof result.current.vm.init).toBe("function");
+  await act(async () => {
+    await hook.result.current.vm.init();
   });
 
-  it("should load todos via queueMicrotask on creation", async () => {
+  return hook;
+}
+
+describe("useTodoViewModel", () => {
+  it("should initialise with a ViewModel instance", () => {
     const { result } = renderHook(() => useTodoViewModel());
 
-    // queueMicrotask + async repository delay — flush both
-    await act(async () => {
-      // Allow the microtask (vm.init()) and its internal awaits to resolve
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    // init is no longer auto-fired on store creation; it is now driven by the
+    // '/' route's loader. Before init runs, version is 0 and todos is empty.
+    expect(result.current.version).toBe(0);
+    expect(result.current.vm).toBeDefined();
+    expect(typeof result.current.vm.init).toBe("function");
+    expect(result.current.vm.todos).toEqual([]);
+  });
+
+  it("should load todos when init is called", async () => {
+    const { result } = await renderAndInit();
 
     expect(result.current.vm.todos.length).toBeGreaterThan(0);
     expect(result.current.vm.isLoading).toBe(false);
   });
 
   it("should increment version when init completes", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     // init calls notify at least twice (loading start + loading end)
     expect(result.current.version).toBeGreaterThanOrEqual(2);
   });
 
   it("should increment version when create is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     const versionBefore = result.current.version;
 
@@ -72,11 +69,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when remove is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     const versionBefore = result.current.version;
     const uuid = result.current.vm.todos[0].uuid;
@@ -89,11 +82,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when toggle is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     const versionBefore = result.current.version;
     const uuid = result.current.vm.todos[0].uuid;
@@ -106,11 +95,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when startEditing is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     const versionBefore = result.current.version;
 
@@ -122,11 +107,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when submitEditing is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     act(() => {
       result.current.vm.startEditing(result.current.vm.todos[0]);
@@ -143,11 +124,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when cancelEditing is called", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     act(() => {
       result.current.vm.startEditing(result.current.vm.todos[0]);
@@ -163,11 +140,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should keep the same vm reference across version bumps", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     const vmBefore = result.current.vm;
 
@@ -179,11 +152,7 @@ describe("useTodoViewModel", () => {
   });
 
   it("should increment version when editing todo title changes", async () => {
-    const { result } = renderHook(() => useTodoViewModel());
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    const { result } = await renderAndInit();
 
     act(() => {
       result.current.vm.startEditing(result.current.vm.todos[0]);

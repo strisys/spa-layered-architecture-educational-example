@@ -1,11 +1,30 @@
+import { Todo } from "./store/TodoViewModel";
 import { useTodoViewModel } from "./store/useTodoViewModel";
 import type { ITodoViewModelStore } from "./store/useTodoViewModel";
 import { useShallow } from "zustand/react/shallow";
 import { TodoItem } from "./TodoItem";
 
+export type TodoStatusFilter = "all" | "active" | "completed";
+
+interface ITodoListProps {
+  filter?: TodoStatusFilter;
+}
+
 const selectSlice = (s: ITodoViewModelStore) => {
   return { vm: s.vm, todos: s.vm.todos, isLoading: s.vm.isLoading, editingVersion: s.vm.editingTodo?.version ?? null };
 };
+
+function applyFilter(todos: Todo[], filter: TodoStatusFilter): Todo[] {
+  if (filter === "active") {
+    return todos.filter((t) => !t.isCompleted);
+  }
+
+  if (filter === "completed") {
+    return todos.filter((t) => t.isCompleted);
+  }
+
+  return todos;
+}
 
 function LoadingIndicator(): React.JSX.Element {
   return (
@@ -32,20 +51,21 @@ function EmptyState(): React.JSX.Element {
   );
 }
 
-export function TodoList(): React.JSX.Element {
+export function TodoList(props: ITodoListProps): React.JSX.Element {
   const { vm, todos, isLoading } = useTodoViewModel(useShallow(selectSlice));
+  const visibleTodos = applyFilter(todos, props.filter ?? "all");
 
   if (isLoading) {
     return <LoadingIndicator />;
   }
 
-  if (todos.length === 0) {
+  if (visibleTodos.length === 0) {
     return <EmptyState />;
   }
 
   return (
     <ul className="flex flex-col gap-2">
-      {todos.map((todo) => (
+      {visibleTodos.map((todo) => (
         <TodoItem key={todo.uuid} todo={todo} vm={vm} />
       ))}
     </ul>
