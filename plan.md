@@ -187,3 +187,106 @@ Existing files to **reuse as-is**:
 6. Navigate to `/about` — static page renders; top-nav `<Link>` highlights the active route.
 7. Router devtools panel is present in dev, absent in a `npm run build && npm run preview` production build.
 8. Existing Vitest suites still pass: `npm test -w @todo/ui` (and sibling packages). No test changes required — VM and repository are unchanged.
+
+---
+
+## Appendix A — Q&A (concepts review)
+
+Ten-question walkthrough of the router setup. Kept here as a reference for future-me or anyone picking this up cold.
+
+### 1. Route tree generation
+
+**Q.** Where is `routeTree.gen.ts` generated from, and what happens if you edit it by hand?
+
+**A.** The `tanstackRouter()` Vite plugin (in `vite.config.ts`) watches `src/routes/` and (re)generates `routeTree.gen.ts` whenever a route file is added, renamed, deleted, or its content changes. Hand-edits are overwritten on the next change. The file starts with `/* eslint-disable */` and `// @ts-nocheck` for this reason. It's committed to source control so `tsc` on a fresh checkout has something to resolve against before Vite has ever run.
+
+### 2. Loader timing vs `queueMicrotask`
+
+**Q.** When does the `/todos` loader (`vm.init()`) run, and what does that give us over the old `queueMicrotask(() => vm.init())` in the Zustand store?
+
+**A.** The loader runs before the route's component renders, and the router blocks the render until the loader's promise resolves. Benefit: no loading flicker — data is hydrated on first paint. The old microtask fired once at module load and the component rendered immediately with an empty list + `isLoading = true`, then re-rendered when data arrived. Secondary benefit: the loader re-runs on every navigation to `/todos`, giving predictable refresh semantics.
+
+### 3. `validateSearch` and typed `<Link>`
+
+**Q.** Why did making `status` optional in `validateSearch`'s return type fix the `<Link>` errors?
+
+**A.** TanStack uses the validator's return type as the search shape for that route. `<Link to="...">` then looks up the target route and makes its `search` prop required if any field in the schema is required (`MakeRequiredSearchParams` in the type). Marking `status` optional means no fields are required, so `search` on `<Link>` becomes optional and callers can omit it. The same type flows into `Route.useSearch()`, which is why we default with `const { status = "all" } = Route.useSearch()`.
+
+### 4. Type-level route registry
+
+**Q.** How does `<Link to="/todos/$uuid">` end up strongly typed against the set of valid paths?
+
+**A.** Two mechanisms:
+
+- **Declaration merging.** The library ships with `interface FileRoutesByPath {}` as a stub. `routeTree.gen.ts` augments it with one entry per route via `declare module '@tanstack/react-router' { interface FileRoutesByPath { ... } }`. TypeScript merges interfaces that share a name; `keyof FileRoutesByPath` becomes the union of registered paths as **string literals**, not `string`.
+- **Generic inference on `<Link>`.** `Link` is roughly `function Link<P extends ValidPath>(props: LinkProps<P>)`. Writing `<Link to="/todos/$uuid">` narrows `P` to that literal, and `LinkProps<"/todos/$uuid">` resolves params/search/loader types via conditional types that look the path up in `FileRoutesByPath`.
+
+Same mechanism powers `navigate()`, `useSearch()`, `useParams()`, `useLoaderData()`.
+
+### 5. `throw notFound()` vs `return undefined`
+
+**Q.** Why does the detail loader `throw notFound()` instead of returning a sentinel?
+
+**A.** Throwing is how TanStack loaders signal non-happy paths. `throw notFound()` is caught by the router, which renders `notFoundComponent` instead of `component`. Returning `undefined` makes the loader *succeed* with `undefined`; the main component renders and `useLoaderData()` hands it `undefined`, crashing at runtime when `todo.title` is accessed. TypeScript doesn't catch it because the loader's declared return type is `Promise<Todo>` — returning `undefined` lies to the type system. Same pattern for auth: `throw redirect({ to: '/login' })`.
+
+### 6. `activeProps` and `activeOptions.exact`
+
+**Q.** Why did the "Todos" link need `activeOptions={{ exact: true }}` when it pointed to `/`, but drop it after moving to `/todos`?
+
+**A.** Active matching is prefix/ancestor-based by default. `<Link to="/">` is a prefix of every URL in the app, so it would be styled "active" on every page. `exact: true` forces an exact path match. For `<Link to="/todos">`, the default prefix match is actually the desired behavior — the nav link stays highlighted on `/todos/$uuid` detail pages, signaling "still in the Todos section." Rule of thumb: use `exact: true` for short/root paths that would over-match; leave it off for section-level links where sub-route highlighting is desired.
+
+### 7. The `Register` block in `main.tsx`
+
+**Q.** What happens if you delete the `declare module '@tanstack/react-router' { interface Register { router: typeof router } }` block?
+
+**A.** Pure type-level breakage. TypeScript strips `declare` statements at compile time — nothing changes at runtime. But the library uses `Register.router` to infer the app's full route graph into the type system. Delete it and `<Link to="...">` accepts any string, `params`/`search` become `any`, `useLoaderData()` returns `unknown`, etc. The runtime router is untouched; the type safety evaporates.
+
+### 8. Dynamic params + nested routes
+
+**Q.** How do you get `/todos/$uuid/edit` in our folder layout, and how is `useParams()` typed in the edit route?
+
+**A.** Two equivalent ways:
+
+```
+Option A (dot-separated):              Option B (folder):
+todos/                                 todos/
+  index.tsx                              index.tsx
+  $uuid.tsx                              $uuid/
+  $uuid.edit.tsx                           index.tsx
+                                           edit.tsx
+```
+
+Both generate the same routes. Option B scales better when `$uuid` gains more children. In the edit route's component, `Route.useParams()` returns `{ uuid: string }` — params are cumulative from ancestors, literal segments (`edit`) don't contribute, and the type is inferred from the path via the same registry trick as `<Link>`.
+
+### 9. `autoCodeSplitting` in production builds
+
+**Q.** What does `autoCodeSplitting: true` change in the `vite:build` output?
+
+**A.** Each route's component and loader become separate chunks, loaded lazily on navigation instead of inlined into the main bundle. From our actual build:
+
+```
+dist/assets/index-CBil_jkc.js        297.83 kB   main bundle
+dist/assets/index-Bq7AYZ9W.js          7.67 kB   landing route
+dist/assets/about-DeDT3S3K.js          1.77 kB   about route
+dist/assets/todos._uuid-CISIacwO.js    1.36 kB   detail component
+dist/assets/todos._uuid-C5iNPx7a.js    0.38 kB   detail loader (split separately)
+```
+
+Loader is split from component so the router can fetch the data code and the UI code in parallel during navigation. Initial page load only downloads the main chunk plus the matched route's chunks.
+
+### 10. Bare specifiers vs relative imports
+
+**Q.** Why did moving `todos.index.tsx` → `todos/index.tsx` break its `../features/...` imports but not the detail route's imports?
+
+**A.** The detail route imports are all **bare specifiers** (`@tanstack/react-router`, `@todo/services`, `@todo/model`, `clsx`). Those resolve via `node_modules` / workspace linkage — independent of the importing file's location. The list route reaches into UI-local code via **relative paths** (`../features/todo/...`); relative paths are resolved against the importing file's directory, so moving the file changes what `../` points to. Aliases in `tsconfig.json` (e.g. `"@/*": ["./src/*"]`) turn intra-package imports into bare-ish specifiers and survive file moves.
+
+### 11. The bookmarked-URL "Todo not found" problem
+
+**Q.** A user opens `/todos/abc-123` in a fresh tab and sees "Todo not found." What two layers are at play?
+
+**A.** (Bonus.)
+
+- **Demo-app layer.** `TodoRepository` builds its seed at module-load time — every fresh page load calls `new Todo()` ten times, generating ten brand-new uuids. A uuid from a previous session doesn't exist in the new session's registry. Persistence (localStorage, API) or hard-coded seed uuids would fix it.
+- **Router layer.** Loaders re-run on every match — including hard reloads and direct URL entry, which reinstantiate the whole JS module graph. `<Link>` (SPA nav) keeps the module graph alive, so uuids line up; typed URLs and bookmarks don't. The router is behaving correctly; the data layer is just ephemeral.
+
+Stable URLs require stable IDs plus persistence. The router guarantees URL → route → loader; what the loader returns is a data-layer concern.
