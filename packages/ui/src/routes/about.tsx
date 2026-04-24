@@ -45,7 +45,7 @@ function AboutPage(): React.JSX.Element {
         </p>
       </Section>
 
-      <Link to="/" className="text-sm text-blue-600 hover:underline">
+      <Link to="/todos" className="text-sm text-blue-600 hover:underline">
         &larr; Back to list
       </Link>
     </div>

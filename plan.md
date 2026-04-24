@@ -50,10 +50,12 @@ New directory `packages/ui/src/routes/`:
 
 ```
 src/routes/
-  __root.tsx            // layout: header/nav, <Outlet/>, devtools in dev
-  index.tsx             // '/'                  — todo list, filter via ?status=
-  todos.$uuid.tsx       // '/todos/:uuid'       — detail view (read-only in phase 1)
+  __root.tsx            // layout: header/nav (app title → '/'), <Outlet/>, devtools in dev
+  index.tsx             // '/'                  — landing page with CTAs
   about.tsx             // '/about'             — static page demonstrating <Link>
+  todos/
+    index.tsx           // '/todos'             — todo list, filter via ?status=
+    $uuid.tsx           // '/todos/:uuid'       — detail view (read-only in phase 1)
 ```
 
 Generated file (committed per TanStack convention): `packages/ui/src/routeTree.gen.ts`.
@@ -61,10 +63,14 @@ Generated file (committed per TanStack convention): `packages/ui/src/routeTree.g
 ### `__root.tsx`
 
 - `createRootRoute({ component: RootLayout })`
-- Renders a small top nav (`<Link to="/">`, `<Link to="/about">`) + `<Outlet />`
-- Mounts `<TanStackRouterDevtools />` when `import.meta.env.DEV`
+- App title is a `<Link to="/">` (home). Nav renders `<Link to="/todos">` + `<Link to="/about">` + `<Outlet />`.
+- Mounts `<TanStackRouterDevtools />` when `import.meta.env.DEV`.
 
-### `index.tsx` — list route
+### `index.tsx` — landing page
+
+- No loader. Renders a short intro paragraph and two CTA buttons: `<Link to="/todos">` (primary) and `<Link to="/about">` (secondary).
+
+### `todos.index.tsx` — list route
 
 - Search validator (hand-rolled, no zod):
   ```ts
@@ -139,9 +145,10 @@ The filter (`?status=`) intentionally lives in the URL, **not** in the VM — it
 | Delete | `packages/ui/src/App.tsx` |
 | Modify | `packages/ui/src/features/todo/store/useTodoViewModel.ts` |
 | Create | `packages/ui/src/routes/__root.tsx` |
-| Create | `packages/ui/src/routes/index.tsx` |
-| Create | `packages/ui/src/routes/todos.$uuid.tsx` |
+| Create | `packages/ui/src/routes/index.tsx` (landing page) |
 | Create | `packages/ui/src/routes/about.tsx` |
+| Create | `packages/ui/src/routes/todos/index.tsx` (list) |
+| Create | `packages/ui/src/routes/todos/$uuid.tsx` (detail) |
 | Generated | `packages/ui/src/routeTree.gen.ts` (commit) |
 
 Existing files to **reuse as-is**:
@@ -160,7 +167,7 @@ Existing files to **reuse as-is**:
 - [x] **7.** Update `packages/ui/src/main.tsx` to create the router and wrap the app in `<RouterProvider />`; add the module-augmentation `Register` block.
 - [x] **8.** Remove `queueMicrotask(() => vm.init())` from `useTodoViewModel.ts` and delete `App.tsx`.
 - [x] **9.** Refactor `TodoContainer` / `TodoList` so the list route can pass a filter (derive visible todos from `vm.todos` + filter); keep inline edit unchanged.
-- [~] **10.** Verify end-to-end — install, `npm run dev -w @todo/ui`, smoke-test all routes in the browser, confirm devtools present in dev and absent in a production build; run `npm test -w @todo/ui`. *(Automated checks green: install, dev server clean, `routeTree.gen.ts` generated, production build succeeds with per-route code splitting, 33/33 tests pass. Browser smoke test pending manual verification.)*
+- [x] **10.** Verify end-to-end — install, `npm run dev -w @todo/ui`, smoke-test all routes in the browser, confirm devtools present in dev and absent in a production build; run `npm test -w @todo/ui`. *(All green: install, dev server clean, `routeTree.gen.ts` auto-regenerates, production build succeeds with per-route code splitting, 33/33 tests pass. Browser smoke test confirmed: list route + all three filter chips + About + not-found + detail route + devtools all render correctly. Note: because the in-memory repository regenerates uuids on every page load, bookmarked detail URLs will 404 after a reload — SPA `<Link>` navigation preserves state and works as designed. Persistence is out of scope for this phase.)*
 
 ## Phase 2 (tabled, not in this change)
 

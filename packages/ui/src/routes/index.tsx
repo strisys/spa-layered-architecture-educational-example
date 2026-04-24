@@ -1,64 +1,35 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { clsx } from "clsx";
-import { useTodoViewModel } from "../features/todo/store/useTodoViewModel";
-import { TodoContainer } from "../features/todo/TodoContainer";
-import type { TodoStatusFilter } from "../features/todo/TodoList";
 
-interface ITodoListSearch {
-  status: TodoStatusFilter;
-}
+function CtaLink(props: { to: "/todos" | "/about"; label: string; primary?: boolean }): React.JSX.Element {
+  const base = "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium";
+  const primary = "bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2";
+  const secondary = "border border-gray-300 text-gray-700 hover:bg-gray-50";
 
-function validateSearch(search: Record<string, unknown>): ITodoListSearch {
-  const status = search.status;
-
-  if (status === "active" || status === "completed") {
-    return { status };
-  }
-
-  return { status: "all" };
-}
-
-const FILTERS: ReadonlyArray<{ value: TodoStatusFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "completed", label: "Completed" },
-];
-
-function FilterBar(props: { current: TodoStatusFilter }): React.JSX.Element {
   return (
-    <div className="flex gap-2 text-xs">
-      {FILTERS.map((f) => (
-        <Link
-          key={f.value}
-          to="/"
-          search={{ status: f.value }}
-          className={clsx(
-            "rounded-full border px-3 py-1",
-            f.value === props.current
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-gray-300 text-gray-600 hover:border-gray-400",
-          )}
-        >
-          {f.label}
-        </Link>
-      ))}
-    </div>
+    <Link to={props.to} className={`${base} ${props.primary ? primary : secondary}`}>
+      {props.label}
+    </Link>
   );
 }
 
-function TodoListPage(): React.JSX.Element {
-  const { status } = Route.useSearch();
-
+function HomePage(): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <FilterBar current={status} />
-      <TodoContainer filter={status} />
+    <div className="flex flex-col gap-6">
+      <p className="text-sm text-gray-700">
+        A small demo app showing MVVM + repository layering with TanStack Router
+        on top. The list page exercises loaders and typed search params; the
+        detail page exercises route params; the About page summarises what each
+        route exercises.
+      </p>
+
+      <div className="flex gap-3">
+        <CtaLink to="/todos" label="View Todos" primary />
+        <CtaLink to="/about" label="About" />
+      </div>
     </div>
   );
 }
 
 export const Route = createFileRoute("/")({
-  validateSearch,
-  loader: (): Promise<void> => useTodoViewModel.getState().vm.init(),
-  component: TodoListPage,
+  component: HomePage,
 });

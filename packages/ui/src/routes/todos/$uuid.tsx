@@ -3,7 +3,7 @@ import { RepositoryRegistry } from "@todo/services";
 import type { Todo } from "@todo/model";
 import { clsx } from "clsx";
 
-function StatusBadge(props: { todo: Todo }): React.JSX.Element {
+function StatusBadge(props: { todo: { isCompleted: boolean } }): React.JSX.Element {
   if (props.todo.isCompleted) {
     return (
       <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
@@ -33,7 +33,7 @@ function TodoDetailPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/" className="text-sm text-blue-600 hover:underline">
+      <Link to="/todos" className="text-sm text-blue-600 hover:underline">
         &larr; Back to list
       </Link>
 
@@ -63,7 +63,7 @@ function TodoDetailPage(): React.JSX.Element {
 function NotFoundPage(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <Link to="/" className="text-sm text-blue-600 hover:underline">
+      <Link to="/todos" className="text-sm text-blue-600 hover:underline">
         &larr; Back to list
       </Link>
 
