@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Todo, TodoStatus } from "@todo/model";
 import { RepositoryRegistry } from "../../src/index";
 
-describe("TodoRepository", () => {
+describe("TodoRepositoryFake", () => {
   let registry: RepositoryRegistry;
 
   beforeEach(() => {

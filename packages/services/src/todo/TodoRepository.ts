@@ -1,58 +1,40 @@
-import { delay } from "@todo/shared";
-import { PersistenceStatus, Todo, TodoStatus } from "@todo/model";
-import type { ITodoState } from "@todo/model";
+import { QueryClient } from "@tanstack/query-core";
+import { PersistenceStatus, Todo } from "@todo/model";
+import { queryClient } from "../shared/queryClient";
+import type { ITodoRepository } from "./ITodoRepository";
+import { todoKeys } from "./todoKeys";
 
+export class TodoRepository implements ITodoRepository {
+  private _queryClient: QueryClient;
 
-function createPersistedTodo(state: Partial<ITodoState>): Todo {
-  const todo = new Todo(state);
-  todo.persistenceStatus = PersistenceStatus.InSync;
-  return todo;
-}
-
-const defaultTodos: Todo[] = [
-  createPersistedTodo({ title: "Buy groceries", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Walk the dog", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Read a book", status: TodoStatus.Completed }),
-  createPersistedTodo({ title: "Write unit tests", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Clean the kitchen", status: TodoStatus.Completed }),
-  createPersistedTodo({ title: "Fix the leaky faucet", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Schedule dentist appointment", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Update resume", status: TodoStatus.Completed }),
-  createPersistedTodo({ title: "Plan weekend trip", status: TodoStatus.Active }),
-  createPersistedTodo({ title: "Organize desk", status: TodoStatus.Active }),
-];
-
-export class TodoRepository {
-  private static readonly FAKE_DELAY_MS: number = 100;
-
-  private _todos: Todo[] = [...defaultTodos];
+  public constructor(client: QueryClient = queryClient) {
+    this._queryClient = client;
+  }
 
   public async getAll(): Promise<Todo[]> {
-    await delay(TodoRepository.FAKE_DELAY_MS);
-    return [...this._todos];
+    return this._queryClient.ensureQueryData({
+      queryKey: todoKeys.list(),
+      queryFn: (): Promise<Todo[]> => this.fetchAll(),
+    });
   }
 
   public async getByUuid(uuid: string): Promise<Todo | undefined> {
-    await delay(TodoRepository.FAKE_DELAY_MS);
-    return this._todos.find((todo) => todo.uuid === uuid);
+    return this._queryClient.ensureQueryData({
+      queryKey: todoKeys.detail(uuid),
+      queryFn: (): Promise<Todo | undefined> => this.fetchByUuid(uuid),
+    });
   }
 
   public async create(todo: Todo): Promise<Todo> {
-    await delay(TodoRepository.FAKE_DELAY_MS);
-    todo.persistenceStatus = PersistenceStatus.InSync;
-    this._todos.unshift(todo);
-    return todo;
+    const created = await this.postCreate(todo);
+    await this._queryClient.invalidateQueries({ queryKey: todoKeys.all });
+    return created;
   }
 
   public async remove(uuid: string): Promise<Todo[]> {
-    await delay(TodoRepository.FAKE_DELAY_MS);
-    const index = this._todos.findIndex((todo) => todo.uuid === uuid);
-
-    if (index !== -1) {
-      this._todos.splice(index, 1);
-    }
-
-    return [...this._todos];
+    await this.deleteByUuid(uuid);
+    await this._queryClient.invalidateQueries({ queryKey: todoKeys.all });
+    return this.getAll();
   }
 
   public async persist(todo: Todo): Promise<boolean> {
@@ -67,15 +49,28 @@ export class TodoRepository {
   }
 
   public async update(todo: Todo): Promise<boolean> {
-    await delay(TodoRepository.FAKE_DELAY_MS);
-    const index = this._todos.findIndex((t) => t.uuid === todo.uuid);
+    const result = await this.putUpdate(todo);
+    await this._queryClient.invalidateQueries({ queryKey: todoKeys.all });
+    return result;
+  }
 
-    if (index === -1) {
-      return false;
-    }
+  private fetchAll(): Promise<Todo[]> {
+    throw new Error("TodoRepository.fetchAll: not implemented");
+  }
 
-    todo.persistenceStatus = PersistenceStatus.InSync;
-    this._todos[index] = todo;
-    return true;
+  private fetchByUuid(_uuid: string): Promise<Todo | undefined> {
+    throw new Error("TodoRepository.fetchByUuid: not implemented");
+  }
+
+  private postCreate(_todo: Todo): Promise<Todo> {
+    throw new Error("TodoRepository.postCreate: not implemented");
+  }
+
+  private deleteByUuid(_uuid: string): Promise<void> {
+    throw new Error("TodoRepository.deleteByUuid: not implemented");
+  }
+
+  private putUpdate(_todo: Todo): Promise<boolean> {
+    throw new Error("TodoRepository.putUpdate: not implemented");
   }
 }

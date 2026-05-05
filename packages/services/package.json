@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@tanstack/query-core": "^5.0.0",
     "@todo/model": "file:../model",
     "@todo/shared": "file:../shared"
   },
